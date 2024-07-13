@@ -8,6 +8,7 @@ import { sep } from "path";
 import { Configuration, OpenAIApi } from "openai";
 import { DayJS } from "./utils/day-js";
 import { BColors } from "bettercolors";
+import { checker } from "prisma/checker";
 import { DataBeyond } from "@bottlycorp/beyond2021";
 
 export let today = DayJS().day();
@@ -67,6 +68,8 @@ client.once("ready", async() => {
   const members = client.guilds.cache.reduce((a, b) => a + b.memberCount, 0);
   colors.log(`Bottly in ready for ${client.guilds.cache.size} guilds and ${members} users!`);
   colors.success("The client has been successfully started!");
+
+  await checker();
 });
 
 export const changeToday = (to: number): void => {
