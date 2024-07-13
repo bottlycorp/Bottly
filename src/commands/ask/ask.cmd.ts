@@ -15,7 +15,7 @@ import { limitString, userWithId } from "$core/utils/function";
 import { QuestionIncludeAll, getQuestion, newQuestion, updateQuestion } from "$core/utils/data/question";
 import { getPrompt } from "@bottlycorp/prompts";
 import { simpleButton, simpleEmbed } from "$core/utils/embed";
-import { buttonsBuilder, favoriteButton, qrCodeButton, regenerateButton, revealButton, usageButton } from "$core/utils/config/buttons";
+import { buttonsBuilder, favoriteButton, premiumButton, qrCodeButton, regenerateButton, revealButton, usageButton } from "$core/utils/config/buttons";
 import { updateUser } from "$core/utils/data/user";
 import { DayJS } from "$core/utils/day-js";
 import { supabase } from "$core/utils/supabase";
@@ -28,12 +28,20 @@ import QRCode from "qrcode";
 export const execute: CommandExecute = async(command, user) => {
   const web = command.options.getBoolean("web", false) ?? false;
   const context = command.options.getString("context", false) ?? "";
+  const model = command.options.getString("model", false) ?? "gpt-3.5-turbo";
 
   const channel = command.channel;
   const askedAt = DayJS().unix();
 
+  if (model !== "gpt-3.5-turbo" && user.isPremium === false) {
+    const premiumEmbed = simpleEmbed(translate(command.locale, global.exec.orGetPremiumGPT4), "premium");
+    colors.error(userWithId(command.user) + " tried to use with a different model without being premium");
+    command.editReply({ embeds: [premiumEmbed], components: [{ type: 1, components: [premiumButton(command)] }] });
+    return;
+  }
+
   const handleNotInTextChannel = (): void => {
-    command.editReply(translate(command.locale, global.config.exec.notInATextChannel));
+    command.editReply(translate(command.locale, global.exec.notInATextChannel));
     colors.error(userWithId(command.user) + " tried to ask a question while not being in a text channel (thread or text channel)");
   };
 
@@ -43,7 +51,7 @@ export const execute: CommandExecute = async(command, user) => {
   }
 
   const handleCooldown = (): void => {
-    command.editReply({ embeds: [simpleEmbed(translate(command.locale, ask.config.exec.cooldown, { s: user.isPremium ? 5 : 10 }), "error")] });
+    command.editReply({ embeds: [simpleEmbed(translate(command.locale, ask.exec.cooldown, { s: user.isPremium ? 5 : 10 }), "error")] });
     colors.error(userWithId(command.user) + " tried to ask a question but is in cooldown");
   };
 
@@ -53,8 +61,8 @@ export const execute: CommandExecute = async(command, user) => {
   }
 
   const embeds = [];
-  embeds.push(simpleEmbed(translate(command.locale, web ? ask.config.exec.waintingWeb : ask.config.exec.waiting), "info"));
-  if (context && web) embeds.push(simpleEmbed(translate(command.locale, ask.config.exec.warningWebContext), "error"));
+  embeds.push(simpleEmbed(translate(command.locale, web ? ask.exec.waintingWeb : ask.exec.waiting), "info"));
+  if (context && web) embeds.push(simpleEmbed(translate(command.locale, ask.exec.warningWebContext), "error"));
 
   const message = await command.editReply({ embeds: embeds });
   setAskCooldown(command.user.id, user.isPremium ? 2500 : 5000);
@@ -74,7 +82,7 @@ export const execute: CommandExecute = async(command, user) => {
   const handlePromptInContext = async(): Promise<void> => {
     const question = await getQuestion(context, command.user.id);
     if (!question) {
-      command.editReply(translate(command.locale, ask.config.exec.error, { error: "Question provided in context does not exist" }));
+      command.editReply(translate(command.locale, ask.exec.error, { error: "Question provided in context does not exist" }));
       return;
     }
 
@@ -86,17 +94,17 @@ export const execute: CommandExecute = async(command, user) => {
     const response = await openai.createChatCompletion({
       messages,
       max_tokens: user.isPremium ? 3750 : 2500,
-      model: "gpt-3.5-turbo",
+      model: model || "gpt-3.5-turbo",
       user: `${command.user.id}-${command.guild?.id}`
     });
 
     if (!response.data.choices[0].message) {
-      command.editReply(translate(command.locale, ask.config.exec.error, { error: "No message in response" }));
+      command.editReply(translate(command.locale, ask.exec.error, { error: "No message in response" }));
       return;
     }
 
     if (!regen) {
-      answer = response.data.choices[0].message?.content;
+      answer = response.data.choices[0].message?.content ?? "";
       answeredAt = DayJS().unix();
     }
   };
@@ -115,8 +123,10 @@ export const execute: CommandExecute = async(command, user) => {
       }
     });
 
+    await updateUser(command.user.id, { usages: { update: { usage: { decrement: 1 } } } });
+
     if (!created) {
-      command.editReply(translate(command.locale, ask.config.exec.error, { error: "Question could not be created" }));
+      command.editReply(translate(command.locale, ask.exec.error, { error: "Question could not be created" }));
       return;
     }
 
@@ -135,7 +145,7 @@ export const execute: CommandExecute = async(command, user) => {
   }
 
   const handleRespond = async(regen = false): Promise<void> => {
-    if (regen) command.editReply({ embeds: [simpleEmbed(translate(command.locale, ask.config.exec.regenerate), "info")], components:
+    if (regen) command.editReply({ embeds: [simpleEmbed(translate(command.locale, ask.exec.regenerate), "info")], components:
       buttonsBuilder(
         url ?? null,
         command,
@@ -197,7 +207,7 @@ export const execute: CommandExecute = async(command, user) => {
         });
       }, web ? 3000 : 2500);
     } catch (error: any) {
-      command.editReply(translate(command.locale, ask.config.exec.error, { error: error.message }));
+      command.editReply(translate(command.locale, ask.exec.error, { error: error.message }));
       return;
     }
   };
@@ -240,7 +250,7 @@ export const execute: CommandExecute = async(command, user) => {
       const { error } = await supabase.storage.from("qrcodes").upload(
         `${command.user.id}/${i.message.id}.png`,
         decode((await QRCode.toBuffer(
-          translate(command.locale, ask.config.exec.qrCode, {
+          translate(command.locale, ask.exec.qrCode, {
             question: limitString(command.options.getString("prompt", true), 256),
             lang: getLocale(command.locale),
             response: answer
@@ -250,7 +260,7 @@ export const execute: CommandExecute = async(command, user) => {
       );
 
       if (error) {
-        command.editReply(translate(command.locale, ask.config.exec.error, { error: error.message }));
+        command.editReply(translate(command.locale, ask.exec.error, { error: error.message }));
         return;
       }
 
@@ -259,7 +269,7 @@ export const execute: CommandExecute = async(command, user) => {
     }
 
     if (!publicUrl) {
-      command.editReply(translate(command.locale, ask.config.exec.error, { error: "No public URL" }));
+      command.editReply(translate(command.locale, ask.exec.error, { error: "No public URL" }));
       colors.error(userWithId(command.user) + " tried to get a QR code but no public URL was returned");
       return;
     }
@@ -267,7 +277,7 @@ export const execute: CommandExecute = async(command, user) => {
     command.editReply({
       embeds: [
         simpleEmbed(
-          translate(command.locale, ask.config.exec.qrCodeDesc),
+          translate(command.locale, ask.exec.qrCodeDesc),
           "info",
           undefined,
           { text: command.user.username, icon_url: command.user.displayAvatarURL(), timestamp: true },
@@ -288,17 +298,25 @@ export const execute: CommandExecute = async(command, user) => {
           if (web && url) {
             channel.send({
               embeds: [answerPublicEmbed(command, answer, command.options.getString("prompt", true), urls)],
-              components: [{ type: 1, components: [simpleButton(translate(command.locale, ask.config.buttons.knowMore), ButtonStyle.Link, url)] }]
+              components: [{ type: 1, components: [simpleButton(translate(command.locale, ask.buttons.knowMore), ButtonStyle.Link, url)] }]
+            }).catch(() => {
+              command.editReply(translate(command.locale, ask.exec.error, {
+                error: "An error occurred while revealing the answer, possibility is a permission error check permissions"
+              }));
             });
           } else {
-            channel.send({ embeds: [answerPublicEmbed(command, answer, command.options.getString("prompt", true), urls)] });
+            channel.send({ embeds: [answerPublicEmbed(command, answer, command.options.getString("prompt", true), urls)] }).catch(() => {
+              command.editReply(translate(command.locale, ask.exec.error, {
+                error: "An error occurred while revealing the answer, possibility is a permission error check permissions"
+              }));
+            });
           }
 
-          command.editReply({ embeds: [simpleEmbed(translate(command.locale, ask.config.buttons.revealed), "info", "")], components: [] });
+          command.editReply({ embeds: [simpleEmbed(translate(command.locale, ask.buttons.revealed), "info", "")], components: [] });
         } catch (error) {
           colors.error(userWithId(command.user) + " tried to reveal the answer but an error occurred: " + error);
           command.editReply(
-            translate(command.locale, global.config.exec.error, {
+            translate(command.locale, global.exec.error, {
               error: "An error occurred while revealing the answer, possibility is a permission error check permissions"
             })
           );
@@ -312,9 +330,9 @@ export const execute: CommandExecute = async(command, user) => {
         break;
       case "regenerate":
         regenerated++;
-        if (regenerated <= (user.isPremium ? 5 : 3)) await handleRespond(true);
+        if (regenerated <= (user.isPremium ? 10 : 2)) await handleRespond(true);
 
-        if (regenerated >= (user.isPremium ? 5 : 3)) {
+        if (regenerated >= (user.isPremium ? 10 : 2)) {
           regeneratedLocked = true;
           command.editReply({ components: buttonsBuilder(
             url ?? null,
@@ -353,13 +371,13 @@ export const execute: CommandExecute = async(command, user) => {
 
 export const answerEmbed = (command: CommandInteraction, answer: string, links: string[] | null = null): EmbedBuilder => {
   let description = "";
-  description += translate(command.locale, ask.config.exec.success, { response: answer });
+  description += translate(command.locale, ask.exec.success, { response: answer });
 
   if (links) {
     description += "\n\n";
-    description += translate(command.locale, ask.config.exec.linksTitle);
+    description += translate(command.locale, ask.exec.linksTitle);
     description += "\n";
-    for (const link of links) description += translate(command.locale, ask.config.exec.links, { title: link.split("/")[2], url: link });
+    for (const link of links) description += translate(command.locale, ask.exec.links, { title: link.split("/")[2], url: link });
   }
 
   return simpleEmbed(
@@ -373,12 +391,12 @@ export const answerEmbed = (command: CommandInteraction, answer: string, links: 
 export const answerPublicEmbed = (command: CommandInteraction, answer: string, prompt: string, links: string[] | null = null): EmbedBuilder => {
   let description = "";
   description += `❔ ${limitString(prompt, 100)}\n\n`;
-  description += translate(command.locale, ask.config.exec.success, { response: answer });
+  description += translate(command.locale, ask.exec.success, { response: answer });
 
   if (links) {
     description += "\n\n";
     for (const link of links) {
-      description += translate(command.locale, ask.config.exec.links, { title: link.split("/")[2], url: link });
+      description += translate(command.locale, ask.exec.links, { title: link.split("/")[2], url: link });
     }
   }
 

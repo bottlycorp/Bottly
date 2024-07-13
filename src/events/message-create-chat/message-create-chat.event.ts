@@ -44,7 +44,7 @@ export const execute: EventExecute<"messageCreate"> = async(message: Message) =>
   if (discussion.active === false) {
     message.delete().catch((err: Error) => {
       colors.error(err.message);
-      message.reply({ embeds: [simpleEmbed(translate(toLocale(user.locale), global.config.exec.error, { error: err.message }), "error")] });
+      message.reply({ embeds: [simpleEmbed(translate(toLocale(user.locale), global.exec.error, { error: err.message }), "error")] });
     });
     thread.setLocked(true);
     return;
@@ -53,7 +53,7 @@ export const execute: EventExecute<"messageCreate"> = async(message: Message) =>
   if (discussion.writing == true || discussion?.userId !== message.author.id) {
     message.delete().catch((err: Error) => {
       colors.error(err.message);
-      message.reply({ embeds: [simpleEmbed(translate(toLocale(user.locale), global.config.exec.error, { error: err.message }), "error")] });
+      message.reply({ embeds: [simpleEmbed(translate(toLocale(user.locale), global.exec.error, { error: err.message }), "error")] });
     });
     return;
   }
@@ -61,7 +61,7 @@ export const execute: EventExecute<"messageCreate"> = async(message: Message) =>
   if (existCache(message.author.id)) {
     message.delete().catch((err: Error) => {
       colors.error(err.message);
-      message.reply({ embeds: [simpleEmbed(translate(toLocale(user.locale), global.config.exec.error, { error: err.message }), "error")] });
+      message.reply({ embeds: [simpleEmbed(translate(toLocale(user.locale), global.exec.error, { error: err.message }), "error")] });
     });
     return;
   }
@@ -69,8 +69,8 @@ export const execute: EventExecute<"messageCreate"> = async(message: Message) =>
   if (user.usages?.usage == 0) {
     message.reply({
       embeds: [
-        simpleEmbed(translate(toLocale(user.locale), global.config.exec.noMoreUsages), "error"),
-        simpleEmbed(translate(toLocale(user.locale), chat.config.exec.downloadCommand, {
+        simpleEmbed(translate(toLocale(user.locale), global.exec.noMoreUsages), "error"),
+        simpleEmbed(translate(toLocale(user.locale), chat.exec.downloadCommand, {
           chatDownload: await findCommand("chat", "download")
         }), "premium", "")
       ]
@@ -132,8 +132,8 @@ export const execute: EventExecute<"messageCreate"> = async(message: Message) =>
   await openai.createChatCompletion({
     messages: messages,
     model: "gpt-3.5-turbo",
-    max_tokens: tokens,
-    user: user.userId
+    user: user.userId,
+    max_tokens: tokens
   }).catch(async(error: Error) => {
     clearInterval(interval);
     deleteCache(message.author.id);
@@ -143,6 +143,7 @@ export const execute: EventExecute<"messageCreate"> = async(message: Message) =>
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     const errorType = error?.response?.data?.error?.type;
+    console.log(errorType);
     if (errorType !== "requests") {
       clearInterval(interval);
       deleteCache(message.author.id);
@@ -150,8 +151,8 @@ export const execute: EventExecute<"messageCreate"> = async(message: Message) =>
       thread.setLocked(true);
 
       message.reply({ embeds: [
-        simpleEmbed(translate(toLocale(user.locale), global.config.exec.error, {
-          error: translate(toLocale(user.locale), global.config.exec.errorTooLong)
+        simpleEmbed(translate(toLocale(user.locale), global.exec.error, {
+          error: translate(toLocale(user.locale), global.exec.errorTooLong)
         }), "error")
       ] });
       return;

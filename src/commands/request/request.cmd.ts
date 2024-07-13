@@ -13,7 +13,7 @@ import { Prisma } from "@prisma/client";
 
 export const execute: CommandExecute = async(command, user) => {
   const questions = user.questions;
-  const question = command.options.getString(request.config.options.question.name["en-US"], true) ?? 1;
+  const question = command.options.getString(request.options.question.name["en-US"], true) ?? 1;
 
   if (questions == null) {
     command.editReply({ content: "You have no questions" });
@@ -26,7 +26,7 @@ export const execute: CommandExecute = async(command, user) => {
   if (!questionExist) {
     command.editReply({
       embeds: [
-        simpleEmbed(translate(command.locale, request.config.exec.thisQuestionDoesNotExist), "error", "", {
+        simpleEmbed(translate(command.locale, request.exec.thisQuestionDoesNotExist), "error", "", {
           text: command.user.username,
           icon_url: command.user.avatarURL() ?? undefined,
           timestamp: true
@@ -43,7 +43,7 @@ export const execute: CommandExecute = async(command, user) => {
   if (data == null) {
     command.editReply({
       embeds: [
-        simpleEmbed(translate(command.locale, request.config.exec.thisQuestionDoesNotExist), "error", "", {
+        simpleEmbed(translate(command.locale, request.exec.thisQuestionDoesNotExist), "error", "", {
           text: command.user.username,
           icon_url: command.user.avatarURL() ?? undefined,
           timestamp: true
@@ -64,20 +64,20 @@ export const execute: CommandExecute = async(command, user) => {
   else rowConfig = { row1max: 2, row2max: 5, row3max: 5, row4max: 5, row5max: 5 };
 
   const updateButtons = (): ButtonBuilder[] => {
-    const emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"];
+    const emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
     const buttons: ButtonBuilder[] = [];
 
     buttons.push(simpleButton(undefined, ButtonStyle.Secondary, "initial", inInitialResponse, { name: "📄" }));
 
     if (data.history.length == 0) {
-      for (let i = 0; i < (user.isPremium ? 5 : 3); i++) {
+      for (let i = 0; i < (user.isPremium ? 10 : 2); i++) {
         buttons.push(simpleButton(undefined, ButtonStyle.Secondary, `p${i + 1}`, true, { name: emojis[i] }));
       }
 
       return buttons;
     }
 
-    for (let i = 0; i < (user.isPremium ? 5 : 3); i++) {
+    for (let i = 0; i < (user.isPremium ? 10 : 2); i++) {
       buttons.push(simpleButton(
         undefined,
         ButtonStyle.Secondary,
@@ -155,6 +155,11 @@ export const execute: CommandExecute = async(command, user) => {
       case "p3":
       case "p4":
       case "p5":
+      case "p6":
+      case "p7":
+      case "p8":
+      case "p9":
+      case "p10":
         inInitialResponse = false;
         actualPage = parseInt(interaction.customId.replace("p", ""));
 
@@ -177,7 +182,7 @@ export const embed = (
   favorite = false
 ): EmbedBuilder => {
   let description = "";
-  description += translate(command.locale, request.config.exec.question, {
+  description += translate(command.locale, request.exec.question, {
     date: data.createdAt,
     date2: data.repliedAt,
     time: answerTime,
@@ -185,19 +190,19 @@ export const embed = (
     guild: data.guildName || "Not defined",
     question: data.question,
     answer: page == 0 ? data.answer : data.history[page - 1] ?? data.answer,
-    favoriteLine: favorite ? translate(command.locale, request.config.exec.favoriteLine, {
+    favoriteLine: favorite ? translate(command.locale, request.exec.favoriteLine, {
       date: data.favoriteAt
     }) : "",
-    regeneratedManyTimes: data.history.length > 0 ? translate(command.locale, request.config.exec.regeneratedManyTimes, {
+    regeneratedManyTimes: data.history.length > 0 ? translate(command.locale, request.exec.regeneratedManyTimes, {
       times: data.history.length
     }) : ""
   });
 
   if (data.webUrls.length > 0) {
     description += "\n\n";
-    description += translate(command.locale, request.config.exec.linksTitle);
+    description += translate(command.locale, request.exec.linksTitle);
     description += "\n";
-    for (const link of data.webUrls) description += translate(command.locale, request.config.exec.links, { title: link.split("/")[2], url: link });
+    for (const link of data.webUrls) description += translate(command.locale, request.exec.links, { title: link.split("/")[2], url: link });
   }
 
   return simpleEmbed(description, "info", "", {
